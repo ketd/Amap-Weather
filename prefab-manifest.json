@@ -1,172 +1,36 @@
 {
   "schema_version": "1.0",
-  "id": "hello-world-prefab",
-  "version": "0.1.0",
-  "name": "Hello World 示例预制件",
-  "description": "一个简单的示例预制件，展示如何创建可被 AI 调用的函数",
+  "id": "amap-weather-prefab",
+  "version": "1.0.0",
+  "name": "高德地图天气查询预制件",
+  "description": "基于高德地图 API 的天气查询预制件，支持实时天气和天气预报查询",
   "tags": [
-    "example",
-    "hello-world",
-    "tutorial"
+    "weather",
+    "amap",
+    "gaode",
+    "china",
+    "forecast"
   ],
   "entry_point": "src/main.py",
   "dependencies_file": "pyproject.toml",
   "functions": [
     {
-      "name": "greet",
-      "description": "向用户问候",
+      "name": "get_weather",
+      "description": "通过城市名称查询实时天气或天气预报",
       "parameters": [
         {
-          "name": "name",
+          "name": "city_name",
           "type": "string",
-          "description": "要问候的名字",
-          "required": false,
-          "default": "World"
-        }
-      ],
-      "returns": {
-        "type": "object",
-        "description": "包含问候结果的对象",
-        "properties": {
-          "success": {
-            "type": "boolean",
-            "description": "操作是否成功"
-          },
-          "message": {
-            "type": "string",
-            "description": "问候消息（成功时）",
-            "optional": true
-          },
-          "name": {
-            "type": "string",
-            "description": "问候的名字（成功时）",
-            "optional": true
-          },
-          "error": {
-            "type": "string",
-            "description": "错误信息（失败时）",
-            "optional": true
-          },
-          "error_code": {
-            "type": "string",
-            "description": "错误代码（失败时）",
-            "optional": true,
-            "enum": ["INVALID_NAME", "UNEXPECTED_ERROR"]
-          }
-        }
-      }
-    },
-    {
-      "name": "echo",
-      "description": "回显输入的文本",
-      "parameters": [
-        {
-          "name": "text",
-          "type": "string",
-          "description": "要回显的文本",
-          "required": true
-        }
-      ],
-      "returns": {
-        "type": "object",
-        "description": "包含回显结果的对象",
-        "properties": {
-          "success": {
-            "type": "boolean",
-            "description": "操作是否成功"
-          },
-          "original": {
-            "type": "string",
-            "description": "原始文本（成功时）",
-            "optional": true
-          },
-          "echo": {
-            "type": "string",
-            "description": "回显的文本（成功时）",
-            "optional": true
-          },
-          "length": {
-            "type": "integer",
-            "description": "文本长度（成功时）",
-            "optional": true
-          },
-          "error": {
-            "type": "string",
-            "description": "错误信息（失败时）",
-            "optional": true
-          },
-          "error_code": {
-            "type": "string",
-            "description": "错误代码（失败时）",
-            "optional": true,
-            "enum": ["EMPTY_TEXT", "UNEXPECTED_ERROR"]
-          }
-        }
-      }
-    },
-    {
-      "name": "add_numbers",
-      "description": "计算两个数字的和",
-      "parameters": [
-        {
-          "name": "a",
-          "type": "number",
-          "description": "第一个数字",
+          "description": "城市名称，例如 '北京市'、'东城区'、'上海市'、'杭州' 等。支持模糊匹配，可以省略'市'、'区'、'县'等后缀",
           "required": true
         },
         {
-          "name": "b",
-          "type": "number",
-          "description": "第二个数字",
-          "required": true
-        }
-      ],
-      "returns": {
-        "type": "object",
-        "description": "包含计算结果的对象",
-        "properties": {
-          "success": {
-            "type": "boolean",
-            "description": "操作是否成功"
-          },
-          "a": {
-            "type": "number",
-            "description": "第一个数字（成功时）",
-            "optional": true
-          },
-          "b": {
-            "type": "number",
-            "description": "第二个数字（成功时）",
-            "optional": true
-          },
-          "sum": {
-            "type": "number",
-            "description": "计算结果（成功时）",
-            "optional": true
-          },
-          "error": {
-            "type": "string",
-            "description": "错误信息（失败时）",
-            "optional": true
-          },
-          "error_code": {
-            "type": "string",
-            "description": "错误代码（失败时）",
-            "optional": true,
-            "enum": ["CALCULATION_ERROR", "UNEXPECTED_ERROR"]
-          }
-        }
-      }
-    },
-    {
-      "name": "fetch_weather",
-      "description": "获取指定城市的天气信息（演示如何使用 secrets）",
-      "parameters": [
-        {
-          "name": "city",
+          "name": "extensions",
           "type": "string",
-          "description": "要查询天气的城市名称，例如 '北京'",
-          "required": true
+          "description": "气象类型：'base' 返回实况天气（默认），'all' 返回预报天气（未来3-4天）",
+          "required": false,
+          "default": "base",
+          "enum": ["base", "all"]
         }
       ],
       "returns": {
@@ -177,25 +41,114 @@
             "type": "boolean",
             "description": "操作是否成功"
           },
-          "city": {
+          "type": {
+            "type": "string",
+            "description": "查询类型：'live' 表示实况天气，'forecast' 表示预报天气（成功时）",
+            "optional": true,
+            "enum": ["live", "forecast"]
+          },
+          "city_name": {
             "type": "string",
             "description": "城市名称（成功时）",
             "optional": true
           },
-          "temperature": {
-            "type": "number",
-            "description": "摄氏温度（成功时）",
-            "optional": true
-          },
-          "condition": {
-            "type": "string",
-            "description": "天气状况，例如 '晴天'（成功时）",
-            "optional": true
-          },
-          "note": {
-            "type": "string",
-            "description": "备注信息（成功时）",
-            "optional": true
+          "data": {
+            "type": "object",
+            "description": "天气数据对象（成功时）",
+            "optional": true,
+            "properties": {
+              "province": {
+                "type": "string",
+                "description": "省份名称"
+              },
+              "city": {
+                "type": "string",
+                "description": "城市名称"
+              },
+              "adcode": {
+                "type": "string",
+                "description": "区域编码"
+              },
+              "weather": {
+                "type": "string",
+                "description": "天气现象（实况天气）",
+                "optional": true
+              },
+              "temperature": {
+                "type": "string",
+                "description": "实时气温，单位：摄氏度（实况天气）",
+                "optional": true
+              },
+              "winddirection": {
+                "type": "string",
+                "description": "风向描述（实况天气）",
+                "optional": true
+              },
+              "windpower": {
+                "type": "string",
+                "description": "风力级别，单位：级（实况天气）",
+                "optional": true
+              },
+              "humidity": {
+                "type": "string",
+                "description": "空气湿度（实况天气）",
+                "optional": true
+              },
+              "reporttime": {
+                "type": "string",
+                "description": "数据发布的时间"
+              },
+              "casts": {
+                "type": "array",
+                "description": "预报数据列表（预报天气）",
+                "optional": true,
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "date": {
+                      "type": "string",
+                      "description": "日期"
+                    },
+                    "week": {
+                      "type": "string",
+                      "description": "星期几"
+                    },
+                    "dayweather": {
+                      "type": "string",
+                      "description": "白天天气现象"
+                    },
+                    "nightweather": {
+                      "type": "string",
+                      "description": "晚上天气现象"
+                    },
+                    "daytemp": {
+                      "type": "string",
+                      "description": "白天温度"
+                    },
+                    "nighttemp": {
+                      "type": "string",
+                      "description": "晚上温度"
+                    },
+                    "daywind": {
+                      "type": "string",
+                      "description": "白天风向"
+                    },
+                    "nightwind": {
+                      "type": "string",
+                      "description": "晚上风向"
+                    },
+                    "daypower": {
+                      "type": "string",
+                      "description": "白天风力"
+                    },
+                    "nightpower": {
+                      "type": "string",
+                      "description": "晚上风力"
+                    }
+                  }
+                }
+              }
+            }
           },
           "error": {
             "type": "string",
@@ -206,15 +159,31 @@
             "type": "string",
             "description": "错误代码（失败时）",
             "optional": true,
-            "enum": ["MISSING_API_KEY", "INVALID_CITY", "UNEXPECTED_ERROR"]
+            "enum": [
+              "MISSING_API_KEY",
+              "INVALID_CITY_NAME",
+              "INVALID_EXTENSIONS",
+              "CITY_DATA_ERROR",
+              "CITY_NOT_FOUND",
+              "API_ERROR",
+              "NO_DATA",
+              "TIMEOUT",
+              "NETWORK_ERROR",
+              "UNEXPECTED_ERROR"
+            ]
+          },
+          "api_infocode": {
+            "type": "string",
+            "description": "高德地图 API 返回的错误码（API_ERROR 时）",
+            "optional": true
           }
         }
       },
       "secrets": [
         {
-          "name": "WEATHER_API_KEY",
-          "description": "用于认证天气服务的 API 密钥",
-          "instructions": "这是一个演示示例。在实际使用中，您需要访问天气服务提供商的网站（例如 https://www.weather-provider.com/api-keys）注册并获取您的免费 API Key。",
+          "name": "AMAP_API_KEY",
+          "description": "高德地图 Web 服务 API Key",
+          "instructions": "请访问高德地图开放平台（https://console.amap.com/dev/key/app）注册账号并创建应用，选择 'Web 服务' 类型，获取 API Key。",
           "required": true
         }
       ]

@@ -1,201 +1,277 @@
 """
-预制件核心逻辑模块
+高德地图天气查询预制件
 
-这是一个示例预制件，展示了如何创建可被 AI 调用的函数。
-所有暴露给 AI 的函数都必须在此文件中定义。
+提供基于高德地图 API 的实时天气和天气预报查询功能。
 
 📖 完整开发指南请查看：PREFAB_GUIDE.md
 """
 
 import os
+import csv
+import requests
+from pathlib import Path
 
 
-def greet(name: str = "World") -> dict:
+def _load_city_codes():
     """
-    向用户问候
-
-    这是一个简单的示例函数，展示了预制件函数的基本结构。
-
-    Args:
-        name: 要问候的名字，默认为 "World"
+    加载城市编码数据（内部函数）
 
     Returns:
-        包含问候结果的字典，格式为：
-        {
-            "success": bool,      # 操作是否成功
-            "message": str,       # 问候消息（成功时）
-            "name": str,          # 问候的名字（成功时）
-            "error": str,         # 错误信息（失败时）
-            "error_code": str     # 错误代码（失败时）
-        }
-
-    Examples:
-        >>> greet()
-        {'success': True, 'message': 'Hello, World!', 'name': 'World'}
-
-        >>> greet(name="Alice")
-        {'success': True, 'message': 'Hello, Alice!', 'name': 'Alice'}
+        dict: 城市名称到 adcode 的映射字典
     """
+    city_codes = {}
+    csv_path = Path(__file__).parent / "city_codes.csv"
+
     try:
-        # 参数验证
-        if not name or not isinstance(name, str):
-            return {
-                "success": False,
-                "error": "name 参数必须是非空字符串",
-                "error_code": "INVALID_NAME"
-            }
-
-        # 生成问候消息
-        message = f"Hello, {name}!"
-
-        # 返回成功结果
-        return {
-            "success": True,
-            "message": message,
-            "name": name
-        }
-
-    except Exception as e:
-        # 捕获并返回异常
-        return {
-            "success": False,
-            "error": str(e),
-            "error_code": "UNEXPECTED_ERROR"
-        }
+        with open(csv_path, 'r', encoding='utf-8') as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                city_name = row['中文名']
+                adcode = row['adcode']
+                if city_name and adcode:
+                    city_codes[city_name] = adcode
+        return city_codes
+    except Exception:
+        return {}
 
 
-def echo(text: str) -> dict:
+def _query_weather_api(adcode: str, extensions: str, api_key: str) -> dict:
     """
-    回显输入的文本
-
-    这个函数演示了基本的输入输出处理。
+    调用高德地图天气 API（内部函数）
 
     Args:
-        text: 要回显的文本
+        adcode: 城市编码
+        extensions: 气象类型 "base" 或 "all"
+        api_key: 高德地图 API Key
 
     Returns:
-        包含回显结果的字典
+        API 响应结果
     """
-    try:
-        if not text:
-            return {
-                "success": False,
-                "error": "text 参数不能为空",
-                "error_code": "EMPTY_TEXT"
-            }
+    api_url = "https://restapi.amap.com/v3/weather/weatherInfo"
+    params = {
+        "key": api_key,
+        "city": adcode,
+        "extensions": extensions,
+        "output": "JSON"
+    }
 
-        return {
-            "success": True,
-            "original": text,
-            "echo": text,
-            "length": len(text)
-        }
-
-    except Exception as e:
-        return {
-            "success": False,
-            "error": str(e),
-            "error_code": "UNEXPECTED_ERROR"
-        }
+    response = requests.get(api_url, params=params, timeout=10)
+    response.raise_for_status()
+    return response.json()
 
 
-def add_numbers(a: float, b: float) -> dict:
+def get_weather(city_name: str, extensions: str = "base") -> dict:
     """
-    计算两个数字的和
+    通过城市名称查询天气信息
 
-    这个函数演示了数值计算的基本模式。
+    支持直接使用中文城市名称查询实时天气或天气预报。
 
     Args:
-        a: 第一个数字
-        b: 第二个数字
-
-    Returns:
-        包含计算结果的字典
-    """
-    try:
-        result = a + b
-        return {
-            "success": True,
-            "a": a,
-            "b": b,
-            "sum": result
-        }
-
-    except Exception as e:
-        return {
-            "success": False,
-            "error": str(e),
-            "error_code": "CALCULATION_ERROR"
-        }
-
-
-def fetch_weather(city: str) -> dict:
-    """
-    获取指定城市的天气信息（示例函数，演示 secrets 的使用）
-
-    这个函数演示了如何在预制件中使用密钥（secrets）。
-    平台会自动将用户配置的密钥注入到环境变量中。
-
-    注意：这是一个演示函数，实际不会调用真实的天气 API。
-
-    Args:
-        city: 要查询天气的城市名称
+        city_name: 城市名称，例如 "北京市"、"东城区"、"上海市"、"杭州" 等
+                  支持模糊匹配，可以省略"市"、"区"、"县"等后缀
+        extensions: 气象类型，可选值：
+                   - "base": 返回实况天气（默认）
+                   - "all": 返回预报天气（未来3-4天）
 
     Returns:
         包含天气信息的字典，格式为：
         {
-            "success": bool,
-            "city": str,
-            "temperature": float,  # 摄氏温度
-            "condition": str,      # 天气状况
-            "error": str,          # 错误信息（失败时）
-            "error_code": str      # 错误代码（失败时）
+            "success": bool,           # 操作是否成功
+            "type": str,               # 查询类型 "live" 或 "forecast"
+            "city_name": str,          # 城市名称
+            "data": dict,              # 天气数据（成功时）
+            "error": str,              # 错误信息（失败时）
+            "error_code": str          # 错误代码（失败时）
+        }
+
+    实况天气数据格式 (extensions="base"):
+        {
+            "province": "省份名",
+            "city": "城市名",
+            "adcode": "区域编码",
+            "weather": "天气现象（汉字描述）",
+            "temperature": "实时气温，单位：摄氏度",
+            "winddirection": "风向描述",
+            "windpower": "风力级别，单位：级",
+            "humidity": "空气湿度",
+            "reporttime": "数据发布的时间"
+        }
+
+    预报天气数据格式 (extensions="all"):
+        {
+            "city": "城市名称",
+            "adcode": "城市编码",
+            "province": "省份名称",
+            "reporttime": "预报发布时间",
+            "casts": [
+                {
+                    "date": "日期",
+                    "week": "星期几",
+                    "dayweather": "白天天气现象",
+                    "nightweather": "晚上天气现象",
+                    "daytemp": "白天温度",
+                    "nighttemp": "晚上温度",
+                    "daywind": "白天风向",
+                    "nightwind": "晚上风向",
+                    "daypower": "白天风力",
+                    "nightpower": "晚上风力"
+                },
+                ...
+            ]
         }
 
     Examples:
-        >>> fetch_weather(city="北京")
-        {'success': True, 'city': '北京', 'temperature': 22.5, 'condition': '晴天'}
+        >>> # 查询北京市实况天气
+        >>> get_weather(city_name="北京市")
+        {
+            'success': True,
+            'type': 'live',
+            'city_name': '北京市',
+            'data': {
+                'province': '北京',
+                'city': '北京市',
+                'weather': '晴',
+                'temperature': '27',
+                ...
+            }
+        }
+
+        >>> # 查询上海天气预报（可以省略"市"）
+        >>> get_weather(city_name="上海", extensions="all")
+        {
+            'success': True,
+            'type': 'forecast',
+            'city_name': '上海',
+            'data': {
+                'city': '上海市',
+                'casts': [...]
+            }
+        }
     """
     try:
-        # 从环境变量中获取 API Key（平台会自动注入）
-        api_key = os.environ.get('WEATHER_API_KEY')
+        # 从环境变量中获取高德地图 API Key
+        api_key = os.environ.get('AMAP_API_KEY')
 
-        # 验证密钥是否已配置
+        # 验证 API Key 是否已配置
         if not api_key:
             return {
                 "success": False,
-                "error": "未配置 WEATHER_API_KEY，请在平台上配置该密钥",
+                "error": "未配置 AMAP_API_KEY，请在平台上配置高德地图 API 密钥",
                 "error_code": "MISSING_API_KEY"
             }
 
-        # 验证参数
-        if not city or not isinstance(city, str):
+        # 验证 city_name 参数
+        if not city_name or not isinstance(city_name, str):
             return {
                 "success": False,
-                "error": "city 参数必须是非空字符串",
-                "error_code": "INVALID_CITY"
+                "error": "city_name 参数必须是非空字符串",
+                "error_code": "INVALID_CITY_NAME"
             }
 
-        # 这里是演示代码，实际应该调用真实的天气 API
-        # import requests
-        # response = requests.get(
-        #     f"https://api.weather-provider.com/current",
-        #     params={"city": city, "key": api_key}
-        # )
-        # data = response.json()
+        # 验证 extensions 参数
+        if extensions not in ["base", "all"]:
+            return {
+                "success": False,
+                "error": "extensions 参数必须是 'base' 或 'all'",
+                "error_code": "INVALID_EXTENSIONS"
+            }
 
-        # 演示：返回模拟数据
+        # 加载城市编码
+        city_codes = _load_city_codes()
+
+        if not city_codes:
+            return {
+                "success": False,
+                "error": "无法加载城市编码数据",
+                "error_code": "CITY_DATA_ERROR"
+            }
+
+        # 查找城市编码 - 精确匹配
+        adcode = city_codes.get(city_name)
+        matched_city_name = city_name
+
+        # 如果精确匹配失败，尝试模糊匹配
+        if not adcode:
+            city_name_cleaned = city_name.rstrip('市区县')
+            for name, code in city_codes.items():
+                if name.rstrip('市区县') == city_name_cleaned:
+                    adcode = code
+                    matched_city_name = name
+                    break
+
+        # 如果仍未找到，返回错误和建议
+        if not adcode:
+            similar_cities = [name for name in city_codes.keys() if city_name[:2] in name]
+            suggestion = f"，您是否想查询：{', '.join(similar_cities[:5])}" if similar_cities else ""
+
+            return {
+                "success": False,
+                "error": f"未找到城市 '{city_name}'{suggestion}",
+                "error_code": "CITY_NOT_FOUND"
+            }
+
+        # 调用高德地图天气 API
+        result = _query_weather_api(adcode, extensions, api_key)
+
+        # 检查 API 返回状态
+        if result.get("status") != "1":
+            error_msg = result.get("info", "未知错误")
+            return {
+                "success": False,
+                "error": f"高德地图 API 返回错误: {error_msg}",
+                "error_code": "API_ERROR",
+                "api_infocode": result.get("infocode")
+            }
+
+        # 根据查询类型返回相应的数据
+        if extensions == "base":
+            # 实况天气
+            lives = result.get("lives", [])
+            if not lives:
+                return {
+                    "success": False,
+                    "error": "未获取到天气数据",
+                    "error_code": "NO_DATA"
+                }
+
+            return {
+                "success": True,
+                "type": "live",
+                "city_name": matched_city_name,
+                "data": lives[0]
+            }
+        else:
+            # 预报天气
+            forecasts = result.get("forecasts", [])
+            if not forecasts:
+                return {
+                    "success": False,
+                    "error": "未获取到天气预报数据",
+                    "error_code": "NO_DATA"
+                }
+
+            return {
+                "success": True,
+                "type": "forecast",
+                "city_name": matched_city_name,
+                "data": forecasts[0]
+            }
+
+    except requests.exceptions.Timeout:
         return {
-            "success": True,
-            "city": city,
-            "temperature": 22.5,
-            "condition": "晴天",
-            "note": "这是演示数据，未调用真实 API"
+            "success": False,
+            "error": "请求超时，请稍后重试",
+            "error_code": "TIMEOUT"
         }
-
+    except requests.exceptions.RequestException as e:
+        return {
+            "success": False,
+            "error": f"网络请求失败: {str(e)}",
+            "error_code": "NETWORK_ERROR"
+        }
     except Exception as e:
         return {
             "success": False,
-            "error": str(e),
+            "error": f"未知错误: {str(e)}",
             "error_code": "UNEXPECTED_ERROR"
         }

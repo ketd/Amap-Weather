@@ -1,19 +1,13 @@
 """
-预制件模块
+高德地图天气查询预制件
 
-这个模块暴露所有可被 AI 调用的函数。
+这个模块提供基于高德地图 API 的天气查询功能。
 """
 
-from .main import (
-    greet,
-    echo,
-    add_numbers,
-)
+from .main import get_weather
 
 __all__ = [
-    "greet",
-    "echo",
-    "add_numbers",
+    "get_weather",
 ]
 
-__version__ = "0.1.0"
+__version__ = "1.0.0"
