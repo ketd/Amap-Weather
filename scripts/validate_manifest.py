@@ -67,9 +67,18 @@ def extract_function_signatures(main_py_path):
     for node in ast.walk(tree):
         if isinstance(node, ast.FunctionDef):
             # 只提取模块级别的函数（不在类内部）
-            if isinstance(node.parent if hasattr(node, 'parent') else None, ast.Module) or \
-                    not any(isinstance(parent, ast.ClassDef) for parent in ast.walk(tree)
-                            if hasattr(parent, 'body') and node in getattr(parent, 'body', [])):
+            # 检查函数是否在类定义内部
+            is_in_class = False
+            for parent in ast.walk(tree):
+                if isinstance(parent, ast.ClassDef):
+                    parent_body = getattr(parent, 'body', [])
+                    # 确保 body 是列表类型再检查
+                    if isinstance(parent_body, list) and node in parent_body:
+                        is_in_class = True
+                        break
+
+            # 只处理不在类中的函数，且不是以 _ 开头的私有函数
+            if not is_in_class and not node.name.startswith('_'):
                 params = []
                 defaults_start = len(node.args.args) - len(node.args.defaults)
 
